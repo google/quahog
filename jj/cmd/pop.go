@@ -64,6 +64,14 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("%s: no such file", seriesFile)
 	}
 	jj := jjvcs.NewClient()
+	repoRoot, err := jj.Root()
+	if err != nil {
+		return err
+	}
+	rootRelRepo, err := filepath.Rel(repoRoot, rootAbspath)
+	if err != nil {
+		return fmt.Errorf("failed to determine repo relative path: %w", err)
+	}
 	baseOp, err := jj.Run("op", "log", "--template", "id", "--limit", "1", "--no-graph")
 	if err != nil {
 		return fmt.Errorf("failed to determine base op: %w", err)
@@ -99,7 +107,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	// Must rollback from this point forward
 	err = func() error {
 		// TODO: We should be able to non-desctructively construct patch chain i.e. make base commit separately.
-		chain, err := quahog.NewPatchChain(jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootUserpath})
+		chain, err := quahog.NewPatchChain(jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
 		if err != nil {
 			return fmt.Errorf("failed to build patch chain: %w", err)
 		}
