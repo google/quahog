@@ -17,6 +17,7 @@ patches.
 This repository contains implementations of the Quahog workflow for the following version control systems:
 
 - **[Mercurial (hg)](./hg/README.md)**
+- **[Jujutsu (jj)](./jj/README.md)**
 
 Please refer to the `README.md` file in each subdirectory for specific installation and usage instructions.
 
