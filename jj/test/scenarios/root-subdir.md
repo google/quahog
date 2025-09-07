@@ -38,7 +38,6 @@ Popping patch "file.diff"
 Successfully popped 1 patch
 
 $ jj new --quiet -r 'description("[PATCH]")' # FIXME »
-$ jj abandon --quiet -r 'description("QUAHOG")-' # FIXME »
 $ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »
 @
 o  [PATCH] file.diff

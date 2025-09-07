@@ -151,6 +151,8 @@ func NewPatchChain(jj jjvcs.Client, opts ChainOptions) (*PatchChain, error) {
 		args := []string{"new", "-m", commitMsg}
 		if len(chain.Patches) != 0 {
 			args = append(args, "--insert-before", chain.Patches[0].ID)
+		} else {
+			args = append(args, "--insert-after", originID)
 		}
 		// TODO: Should we add an --insert-after to get the base to appear pre-octopus?
 		_, err := jj.Run(args...)
