@@ -10,11 +10,13 @@ Quahog is a Go-based tool that enables managing Quilt-style patch sets using the
 - [Git](https://git-scm.com/) - Used for patch application (similar to quahog)
 - Go 1.24+ - For building from source
 
-### Running
+### Building locally
 
 ```bash
-go run github.com/google/quahog/jj@latest -- --help
-# or `go install` to install locally
+go install github.com/google/quahog/jj/cmd/quahog@latest
+quahog --help
+# or run directly with `go run`:
+# go run github.com/google/quahog/jj/cmd/quahog@latest --help
 ```
 
 ## Usage
