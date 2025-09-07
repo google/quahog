@@ -119,7 +119,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 		rev = originRev.ID
 	}
 	err = func() error {
-		chain, err := quahog.NewPatchChain(jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootUserpath})
+		chain, err := quahog.NewPatchChain(jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
 		if err != nil {
 			return fmt.Errorf("failed to build patch chain: %w", err)
 		}
@@ -176,7 +176,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 			if len(commit.Parents) > 1 {
 				return fmt.Errorf("[unimplemented] patch commit for %s has multiple parents", name)
 			}
-			content, err := quahog.PatchContent(jj, commit, rootRelRepo)
+			content, err := quahog.PatchContent(jj, commit, rootAbspath, rootRelRepo)
 			if err != nil {
 				return fmt.Errorf("generating patch for %s: %w", name, err)
 			}

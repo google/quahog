@@ -246,7 +246,8 @@ func (*Manager) copyFile(src, dst string) error {
 
 // ApplyPatch applies a patch to the working directory using git apply
 func ApplyPatch(patchContent, rootPath string) error {
-	cmd := exec.Command("git", "apply", "--directory", rootPath, "-")
+	cmd := exec.Command("git", "apply", "-")
+	cmd.Dir = rootPath
 	cmd.Stdin = bytes.NewBufferString(patchContent)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -258,7 +259,8 @@ func ApplyPatch(patchContent, rootPath string) error {
 
 // ApplyPatchReverse applies a patch in reverse to remove changes using git apply
 func ApplyPatchReverse(patchContent, rootPath string) error {
-	cmd := exec.Command("git", "apply", "--reverse", "--directory", rootPath, "-")
+	cmd := exec.Command("git", "apply", "--reverse", "-")
+	cmd.Dir = rootPath
 	cmd.Stdin = bytes.NewBufferString(patchContent)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

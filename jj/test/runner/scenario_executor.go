@@ -22,6 +22,7 @@ import (
 // ScenarioExecutor runs simple shell-style tests.
 type ScenarioExecutor struct {
 	tempDir    string
+	execDir    string
 	t          *testing.T
 	lastOutput string
 }
@@ -34,6 +35,7 @@ func NewScenarioExecutor(t *testing.T) (*ScenarioExecutor, error) {
 	}
 	return &ScenarioExecutor{
 		tempDir: tempDir,
+		execDir: tempDir,
 		t:       t,
 	}, nil
 }
@@ -76,7 +78,7 @@ func (e *ScenarioExecutor) RunTest(test *ScenarioTest) error {
 		} else if fields[0] == "quahog" {
 			cmdErr = e.executeQuahogCommand(step.Content)
 		} else if fields[0] == "cd" {
-			cmdErr = os.Chdir(fields[1])
+			e.execDir = filepath.Join(e.execDir, fields[1])
 		} else {
 			cmdErr = e.executeShellCommand(step.Content)
 		}
@@ -121,7 +123,7 @@ func (e *ScenarioExecutor) executeQuahogCommand(command string) error {
 
 	// Execute from the test's temp directory.
 	oldDir, _ := os.Getwd()
-	os.Chdir(e.tempDir)
+	os.Chdir(e.execDir)
 	defer func() { os.Chdir(oldDir) }()
 
 	// Cobra wants a slice of args, excluding the program name.
@@ -147,7 +149,7 @@ func (e *ScenarioExecutor) executeShellCommand(command string) error {
 	defer func() { e.lastOutput = output.String() }()
 
 	cmd := exec.Command("/bin/bash", "-c", command)
-	cmd.Dir = e.tempDir
+	cmd.Dir = e.execDir
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 	cmd.Run() // We don't return Run's error, as tests may expect failure.

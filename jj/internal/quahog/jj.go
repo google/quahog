@@ -196,7 +196,7 @@ func PatchMetadata(c *jjvcs.Change) (name, description string, err error) {
 }
 
 // PatchContent generates a patch from a commit
-func PatchContent(jj jjvcs.Client, c *jjvcs.Change, rootPath string) (string, error) {
+func PatchContent(jj jjvcs.Client, c *jjvcs.Change, repoAbspath, repoRelpath string) (string, error) {
 	_, desc, err := PatchMetadata(c)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate patch metadata: %w", err)
@@ -207,7 +207,7 @@ func PatchContent(jj jjvcs.Client, c *jjvcs.Change, rootPath string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("failed to generate diff: %w", err)
 	}
-	diff, err := jj.Run("diff", "--git", "-r", c.ID, "--", rootPath)
+	diff, err := jj.Run("diff", "--git", "-r", c.ID, "--", repoAbspath)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -215,7 +215,7 @@ func PatchContent(jj jjvcs.Client, c *jjvcs.Change, rootPath string) (string, er
 		return "", fmt.Errorf("patch contains edits outside root")
 	}
 	// Convert jj diff to quilt format
-	quiltDiff := quilt.FormatGitDiff(diff, rootPath)
+	quiltDiff := quilt.FormatGitDiff(diff, repoRelpath)
 	// Combine description and diff
 	var content strings.Builder
 	if len(desc) > 0 {

@@ -64,14 +64,6 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("%s: no such file", seriesFile)
 	}
 	jj := jjvcs.NewClient()
-	repoRoot, err := jj.Root()
-	if err != nil {
-		return err
-	}
-	rootRelRepo, err := filepath.Rel(repoRoot, rootAbspath)
-	if err != nil {
-		return fmt.Errorf("failed to determine repo relative path: %w", err)
-	}
 	baseOp, err := jj.Run("op", "log", "--template", "id", "--limit", "1", "--no-graph")
 	if err != nil {
 		return fmt.Errorf("failed to determine base op: %w", err)
@@ -132,7 +124,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 			if err != nil {
 				return fmt.Errorf("failed to read patch %s: %w", patchInfo.Name, err)
 			}
-			if err := quilt.ApplyPatchReverse(patchContent[i], rootRelRepo); err != nil {
+			if err := quilt.ApplyPatchReverse(patchContent[i], rootAbspath); err != nil {
 				return fmt.Errorf("failed to reverse patch %s: %w", patchInfo.Name, err)
 			}
 			if err := patchManager.RemovePatch(patchInfo.Name); err != nil {
@@ -159,7 +151,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		}
 		for i, patchInfo := range patches {
 			// Apply patch in reverse to remove changes
-			if err = quilt.ApplyPatch(patchContent[i], rootRelRepo); err != nil {
+			if err = quilt.ApplyPatch(patchContent[i], rootAbspath); err != nil {
 				return fmt.Errorf("failed to apply patch %s: %w", patchInfo.Name, err)
 			}
 			commitMsg := fmt.Sprintf("[PATCH] %s", patchInfo.Name)
