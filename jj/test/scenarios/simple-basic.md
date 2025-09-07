@@ -34,7 +34,6 @@ $ # Check patch file content
 $ cat test-project/patches/test-patch-1.diff »
 This is a test patch
 
-index 2fd01525c9..8f23831524 100644
 --- a/file.txt
 +++ b/file.txt
 @@ -1,1 +1,1 @@

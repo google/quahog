@@ -279,7 +279,7 @@ func FormatGitDiff(diff, rootPath string) string {
 	scanner := bufio.NewScanner(strings.NewReader(diff))
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "diff --git") {
+		if strings.HasPrefix(line, "diff --git") || strings.HasPrefix(line, "index ") {
 			// Skip these lines entirely as Quilt's default diff generation doesn't
 			// include them (as it doesn't use git to compute diffs).
 			continue
