@@ -30,14 +30,20 @@ type Client interface {
 	Rev(context.Context, string) (*Change, error)
 	Squash(context.Context, []string, string) error
 }
-type client struct{}
+type client struct{
+	repository string
+}
 
-func NewClient() Client {
-	return &client{}
+func NewClient(repository string) Client {
+	return &client{repository: repository}
 }
 
 // Run executes a jj command and returns its output.
 func (j *client) Run(ctx context.Context, args ...string) (string, error) {
+	// Add repository flag if specified
+	if j.repository != "" {
+		args = append([]string{"-R", j.repository}, args...)
+	}
 	cmd := exec.CommandContext(ctx, "jj", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

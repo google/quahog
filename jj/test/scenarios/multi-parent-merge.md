@@ -42,6 +42,9 @@ Flags:
       --rev string    specific revisions to fold
       --root string   directory containing patches/ subdirectory
       --to string     base commit to fold into
+
+Global Flags:
+  -R, --repository string   Path to repository to operate on
 $ # Should have remained unchanged
 $ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »
 @

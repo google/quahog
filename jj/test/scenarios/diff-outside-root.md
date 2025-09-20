@@ -37,5 +37,7 @@ Flags:
       --root string   directory containing patches/ subdirectory
       --to string     base commit to fold into
 
+Global Flags:
+  -R, --repository string   Path to repository to operate on
 
 ```

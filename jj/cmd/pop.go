@@ -34,6 +34,7 @@ The pop operation:
 
 // PopConfig holds the configuration for the pop command
 type PopConfig struct {
+	*GlobalConfig
 	Root  string
 	From  string
 	Count int
@@ -41,8 +42,8 @@ type PopConfig struct {
 }
 
 // Pop creates a new cobra.Command for the pop operation
-func Pop() *cobra.Command {
-	var cfg PopConfig
+func Pop(globalCfg *GlobalConfig) *cobra.Command {
+	cfg := PopConfig{GlobalConfig: globalCfg}
 	cmd := *popCommand
 	cmd.Flags().AddFlagSet(popFlags(cmd.Name(), &cfg))
 	cmd.MarkFlagRequired("root")
@@ -64,6 +65,12 @@ func popFlags(name string, cfg *PopConfig) *pflag.FlagSet {
 }
 
 func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
+	// Resolve repo path
+	jj := jjvcs.NewClient(cfg.Repository)
+	repoRoot, err := jj.Root(ctx)
+	if err != nil {
+		return err
+	}
 	// Resolve root path
 	rootUserpath := filepath.Clean(cfg.Root)
 	rootAbspath, _ := filepath.Abs(rootUserpath)
@@ -78,11 +85,6 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	seriesFile := filepath.Join(patchesDir, "series")
 	if _, err := os.Stat(seriesFile); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: no such file", seriesFile)
-	}
-	jj := jjvcs.NewClient()
-	repoRoot, err := jj.Root(ctx)
-	if err != nil {
-		return err
 	}
 	rootRelRepo, err := filepath.Rel(repoRoot, rootAbspath)
 	if err != nil {

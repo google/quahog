@@ -7,6 +7,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// GlobalConfig holds configuration set by persistent flags on the Root command
+type GlobalConfig struct {
+	Repository string
+}
+
 var root = &cobra.Command{
 	Use:   "quahog",
 	Short: "Quahog - Quilt-style patch management for Jujutsu",
@@ -22,7 +27,9 @@ Key features:
 }
 
 func Root() *cobra.Command {
-	newRoot := *root
-	newRoot.AddCommand(Fold(), Pop())
-	return &newRoot
+	var globalCfg GlobalConfig
+	cmd := *root
+	cmd.PersistentFlags().StringVarP(&globalCfg.Repository, "repository", "R", "", "Path to repository to operate on")
+	cmd.AddCommand(Fold(&globalCfg), Pop(&globalCfg))
+	return &cmd
 }

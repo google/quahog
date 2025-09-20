@@ -33,8 +33,8 @@ The fold operation:
 5. Squashes patch commits into the base commit`,
 }
 
-func Fold() *cobra.Command {
-	var cfg FoldConfig
+func Fold(globalCfg *GlobalConfig) *cobra.Command {
+	cfg := FoldConfig{GlobalConfig: globalCfg}
 	cmd := *foldCommand
 	cmd.Flags().AddFlagSet(foldFlags(foldCommand.Name(), &cfg))
 	cmd.MarkFlagRequired("root")
@@ -56,6 +56,7 @@ func foldFlags(name string, cfg *FoldConfig) *pflag.FlagSet {
 }
 
 type FoldConfig struct {
+	*GlobalConfig
 	Root  string
 	To    string
 	Count int
@@ -64,6 +65,12 @@ type FoldConfig struct {
 }
 
 func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
+	// Resolve repo path
+	jj := jjvcs.NewClient(cfg.Repository)
+	repoRoot, err := jj.Root(ctx)
+	if err != nil {
+		return err
+	}
 	// Resolve root path
 	rootUserpath := filepath.Clean(cfg.Root)
 	rootAbspath, err := filepath.Abs(rootUserpath)
@@ -77,11 +84,6 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 	patchesDir := filepath.Join(rootAbspath, "patches")
 	if _, err := os.Stat(patchesDir); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
-	}
-	jj := jjvcs.NewClient()
-	repoRoot, err := jj.Root(ctx)
-	if err != nil {
-		return err
 	}
 	rootRelRepo, err := filepath.Rel(repoRoot, rootAbspath)
 	if err != nil {
