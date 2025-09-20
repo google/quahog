@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"text/template"
@@ -119,16 +120,25 @@ func (e *ScenarioExecutor) executeQuahogCommand(command string) error {
 	var output bytes.Buffer
 	defer func() { e.lastOutput = output.String() }()
 
-	// Execute from the test's temp directory.
-	oldDir, _ := os.Getwd()
-	os.Chdir(e.execDir)
-	defer func() { os.Chdir(oldDir) }()
-
+	// NOTE: Substitute relative root params for ones absolute wrt execDir
+	rootRe := regexp.MustCompile(`(--root[= ])([^/][^\s]*)`)
+	command = rootRe.ReplaceAllStringFunc(command, func(match string) string {
+		parts := rootRe.FindStringSubmatch(match)
+		return parts[1] + filepath.Join(e.execDir, parts[2])
+	})
 	// Cobra wants a slice of args, excluding the program name.
 	args := strings.Fields(command)[1:]
-
-	// Reset flag changed state before each execution
+	// NOTE: Detect repository from execDir, if present
+	var jjRoot string
+	for dir := e.execDir; dir != "/"; dir, _ = filepath.Split(filepath.Clean(dir)) {
+		if _, err := os.Stat(filepath.Join(dir, ".jj")); err == nil {
+			jjRoot = dir
+			break
+		}
+	}
+	// Construct separate command to isolate each execution
 	root := cmd.Root()
+	root.PersistentFlags().Set("repository", jjRoot)
 	root.SetOut(&output)
 	root.SetErr(&output)
 	root.SetArgs(args)

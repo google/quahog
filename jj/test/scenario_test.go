@@ -42,6 +42,7 @@ func TestScenarios(t *testing.T) {
 
 // runScenarioTest executes a single scenario test
 func runScenarioTest(t *testing.T, testFile string) {
+	t.Parallel()
 	// Parse the test
 	test, err := runner.ParseFile(testFile)
 	if err != nil {
