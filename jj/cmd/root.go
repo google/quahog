@@ -4,13 +4,10 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
-var Root = &cobra.Command{
+var root = &cobra.Command{
 	Use:   "quahog",
 	Short: "Quahog - Quilt-style patch management for Jujutsu",
 	Long: `Quahog enables managing Quilt-style patch sets using the Jujutsu version control system.
@@ -24,10 +21,8 @@ Key features:
 - Rebase patch sets onto new versions`,
 }
 
-func Execute() {
-	err := Root.Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+func Root() *cobra.Command {
+	newRoot := *root
+	newRoot.AddCommand(Fold(), Pop())
+	return &newRoot
 }

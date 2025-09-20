@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,9 +17,10 @@ import (
 	"github.com/google/quahog/jj/internal/quahog"
 	"github.com/google/quahog/jj/internal/quilt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-var Fold = &cobra.Command{
+var foldCommand = &cobra.Command{
 	Use:   "fold",
 	Short: "Fold jj commits into quilt patches",
 	Long: `Fold converts jj commits with [PATCH] descriptions into quilt patch files.
@@ -29,33 +31,41 @@ The fold operation:
 3. Creates patch files in patches/ directory
 4. Updates the series file
 5. Squashes patch commits into the base commit`,
-	RunE: runFold,
 }
 
-var (
-	foldRoot  string
-	foldTo    string
-	foldCount int
-	foldAll   bool
-	foldRev   string
-)
-
-func init() {
-	Root.AddCommand(Fold)
-
-	Fold.Flags().StringVar(&foldRoot, "root", "", "directory containing patches/ subdirectory")
-	Fold.Flags().StringVar(&foldTo, "to", "", "base commit to fold into")
-	Fold.Flags().IntVar(&foldCount, "count", 1, "number of patches to fold")
-	Fold.Flags().BoolVar(&foldAll, "all", false, "fold all patches")
-	Fold.Flags().StringVar(&foldRev, "rev", "", "specific revisions to fold")
-
-	Fold.MarkFlagRequired("root")
+func Fold() *cobra.Command {
+	var cfg FoldConfig
+	cmd := *foldCommand
+	cmd.Flags().AddFlagSet(foldFlags(foldCommand.Name(), &cfg))
+	cmd.MarkFlagRequired("root")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		cio := IO{Out: cmd.OutOrStdout(), Err: cmd.OutOrStderr()}
+		return runFold(cmd.Context(), cio, cfg)
+	}
+	return &cmd
 }
 
-func runFold(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
+func foldFlags(name string, cfg *FoldConfig) *pflag.FlagSet {
+	set := pflag.NewFlagSet(name, pflag.ContinueOnError)
+	set.StringVar(&cfg.Root, "root", "", "directory containing patches/ subdirectory")
+	set.StringVar(&cfg.To, "to", "", "base commit to fold into")
+	set.IntVar(&cfg.Count, "count", 1, "number of patches to fold")
+	set.BoolVar(&cfg.All, "all", false, "fold all patches")
+	set.StringVar(&cfg.Rev, "rev", "", "specific revisions to fold")
+	return set
+}
+
+type FoldConfig struct {
+	Root  string
+	To    string
+	Count int
+	All   bool
+	Rev   string
+}
+
+func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 	// Resolve root path
-	rootUserpath := filepath.Clean(foldRoot)
+	rootUserpath := filepath.Clean(cfg.Root)
 	rootAbspath, err := filepath.Abs(rootUserpath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute path for %s: %w", rootUserpath, err)
@@ -93,8 +103,8 @@ func runFold(cmd *cobra.Command, args []string) error {
 		originChild = true
 	}
 	var foldToRev *jjvcs.Change
-	if foldTo != "" {
-		foldToRev, err = jj.Rev(ctx, foldTo)
+	if cfg.To != "" {
+		foldToRev, err = jj.Rev(ctx, cfg.To)
 		if err != nil {
 			return err
 		}
@@ -103,20 +113,20 @@ func runFold(cmd *cobra.Command, args []string) error {
 		}
 	}
 	var foldRevs []*jjvcs.Change
-	if foldRev != "" {
-		foldRevs, err = jj.Revs(ctx, foldRev)
+	if cfg.Rev != "" {
+		foldRevs, err = jj.Revs(ctx, cfg.Rev)
 		if err != nil {
 			return err
 		}
 		if len(foldRevs) == 0 {
-			return fmt.Errorf("revset empty: %s", foldRev)
+			return fmt.Errorf("revset empty: %s", cfg.Rev)
 		}
 	}
 	// Prefer the origin revision closest to the base for building the chain
 	var rev string
-	if foldTo != "" {
+	if cfg.To != "" {
 		rev = foldToRev.ID
-	} else if foldRev != "" {
+	} else if cfg.Rev != "" {
 		rev = foldRevs[0].ID
 	} else {
 		rev = originRev.ID
@@ -138,19 +148,19 @@ func runFold(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("--rev commits not found at start of patch chain")
 			}
 			toFold = len(foldRevs)
-		} else if foldAll {
+		} else if cfg.All {
 			toFold = len(chain.Patches)
-		} else if foldCount > 0 {
-			if foldCount > len(chain.Patches) {
-				return fmt.Errorf("--count %d greater than patch chain length %d", foldCount, len(chain.Patches))
+		} else if cfg.Count > 0 {
+			if cfg.Count > len(chain.Patches) {
+				return fmt.Errorf("--count %d greater than patch chain length %d", cfg.Count, len(chain.Patches))
 			}
-			toFold = foldCount
+			toFold = cfg.Count
 		} else {
-			fmt.Fprintln(cmd.OutOrStderr(), "No patches to fold")
+			fmt.Fprintln(cio.Err, "No patches to fold")
 			return nil
 		}
 		commits := chain.Patches[:toFold]
-		fmt.Fprintf(cmd.OutOrStderr(), "Folding %d patch%s into \"%s\"\n", len(commits), pluralize(commits, "es"), rootUserpath)
+		fmt.Fprintf(cio.Err, "Folding %d patch%s into \"%s\"\n", len(commits), pluralize(commits, "es"), rootUserpath)
 		// Generate patches from commits
 		patchManager := quilt.NewManager(rootAbspath)
 		var patchNames, patchContent []string
@@ -167,7 +177,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("patch commit for %s is divergent", name)
 			}
 			if commit.IsEmpty {
-				fmt.Fprintf(cmd.OutOrStderr(), "warning: patch %s is empty. excluding from series\n", name)
+				fmt.Fprintf(cio.Err, "warning: patch %s is empty. excluding from series\n", name)
 				continue // Skip this commit as a no-op
 			}
 			// TODO: This is overly-pessimistic but prevents a tricky bug that needs to be properly handled.
@@ -210,15 +220,15 @@ func runFold(cmd *cobra.Command, args []string) error {
 		if _, err := jj.Run(ctx, restoreArgs...); err != nil {
 			return fmt.Errorf("failed to restore commit position: %w", err)
 		}
-		fmt.Fprintf(cmd.OutOrStderr(), "Successfully folded %d patch%s\n", len(commits), pluralize(commits, "es"))
+		fmt.Fprintf(cio.Err, "Successfully folded %d patch%s\n", len(commits), pluralize(commits, "es"))
 		return nil
 	}()
 	if err != nil {
-		fmt.Fprint(cmd.OutOrStderr(), "encountered error. rolling back... ")
+		fmt.Fprint(cio.Err, "encountered error. rolling back... ")
 		if _, rollbackErr := jj.Run(ctx, "op", "restore", baseOp); rollbackErr != nil {
-			fmt.Fprintf(cmd.OutOrStderr(), "failed: %v\n", rollbackErr)
+			fmt.Fprintf(cio.Err, "failed: %v\n", rollbackErr)
 		} else {
-			fmt.Fprintln(cmd.OutOrStderr(), "done")
+			fmt.Fprintln(cio.Err, "done")
 		}
 	}
 	return err

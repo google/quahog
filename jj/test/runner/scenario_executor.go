@@ -15,8 +15,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/quahog/jj/cmd"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // ScenarioExecutor runs simple shell-style tests.
@@ -130,16 +128,11 @@ func (e *ScenarioExecutor) executeQuahogCommand(command string) error {
 	args := strings.Fields(command)[1:]
 
 	// Reset flag changed state before each execution
-	for _, c := range append([]*cobra.Command{cmd.Root}, cmd.Root.Commands()...) {
-		c.Flags().Visit(func(f *pflag.Flag) {
-			f.Changed = false
-			f.Value.Set(f.DefValue)
-		})
-	}
-	cmd.Root.SetOut(&output)
-	cmd.Root.SetErr(&output)
-	cmd.Root.SetArgs(args)
-	cmd.Root.Execute() // We don't return Execute's error, as tests may expect failure.
+	root := cmd.Root()
+	root.SetOut(&output)
+	root.SetErr(&output)
+	root.SetArgs(args)
+	root.Execute() // We don't return Execute's error, as tests may expect failure.
 	return nil
 }
 

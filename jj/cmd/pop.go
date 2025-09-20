@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,9 +17,10 @@ import (
 	"github.com/google/quahog/jj/internal/quahog"
 	"github.com/google/quahog/jj/internal/quilt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-var Pop = &cobra.Command{
+var popCommand = &cobra.Command{
 	Use:   "pop",
 	Short: "Pop quilt patches into jj commits",
 	Long: `Pop converts quilt patch files into jj commits with [PATCH] descriptions.
@@ -28,31 +30,42 @@ The pop operation:
 2. Applies each patch in reverse to remove its changes
 3. Creates new commits with [PATCH] descriptions
 4. Removes patch files and updates the series file`,
-	RunE: runPop,
 }
 
-var (
-	popRoot  string
-	popFrom  string
-	popCount int
-	popAll   bool
-)
-
-func init() {
-	Root.AddCommand(Pop)
-
-	Pop.Flags().StringVar(&popRoot, "root", "", "directory containing patches/ subdirectory")
-	Pop.Flags().StringVar(&popFrom, "from", "", "base commit to pop from")
-	Pop.Flags().IntVar(&popCount, "count", 1, "number of patches to pop")
-	Pop.Flags().BoolVar(&popAll, "all", false, "pop all patches")
-
-	Pop.MarkFlagRequired("root")
+// PopConfig holds the configuration for the pop command
+type PopConfig struct {
+	Root  string
+	From  string
+	Count int
+	All   bool
 }
 
-func runPop(cmd *cobra.Command, args []string) (err error) {
-	ctx := cmd.Context()
+// Pop creates a new cobra.Command for the pop operation
+func Pop() *cobra.Command {
+	var cfg PopConfig
+	cmd := *popCommand
+	cmd.Flags().AddFlagSet(popFlags(cmd.Name(), &cfg))
+	cmd.MarkFlagRequired("root")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		cio := IO{Out: cmd.OutOrStdout(), Err: cmd.OutOrStderr()}
+		return runPop(cmd.Context(), cio, cfg)
+	}
+	return &cmd
+}
+
+// popFlags creates a new FlagSet for the pop command
+func popFlags(name string, cfg *PopConfig) *pflag.FlagSet {
+	set := pflag.NewFlagSet(name, pflag.ContinueOnError)
+	set.StringVar(&cfg.Root, "root", "", "directory containing patches/ subdirectory")
+	set.StringVar(&cfg.From, "from", "", "base commit to pop from")
+	set.IntVar(&cfg.Count, "count", 1, "number of patches to pop")
+	set.BoolVar(&cfg.All, "all", false, "pop all patches")
+	return set
+}
+
+func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	// Resolve root path
-	rootUserpath := filepath.Clean(popRoot)
+	rootUserpath := filepath.Clean(cfg.Root)
 	rootAbspath, _ := filepath.Abs(rootUserpath)
 	if _, err := os.Stat(rootAbspath); err != nil {
 		return err
@@ -92,8 +105,8 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		originChild = true
 	}
 	var popFromRev *jjvcs.Change
-	if popFrom != "" {
-		popFromRev, err = jj.Rev(ctx, popFrom)
+	if cfg.From != "" {
+		popFromRev, err = jj.Rev(ctx, cfg.From)
 		if err != nil {
 			return err
 		}
@@ -118,15 +131,15 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 			return fmt.Errorf("unexpected patch chain base: %s", chain.Base.ID)
 		}
 		// Get patches to pop
-		patches, err := patchManager.GetPatchesToPop(popCount, popAll)
+		patches, err := patchManager.GetPatchesToPop(cfg.Count, cfg.All)
 		if err != nil {
 			return fmt.Errorf("failed to get patches to pop: %w", err)
 		}
 		if len(patches) == 0 {
-			fmt.Fprintf(cmd.OutOrStderr(), "No patches to pop")
+			fmt.Fprintln(cio.Err, "No patches to pop")
 			return nil
 		}
-		fmt.Fprintf(cmd.OutOrStderr(), "Popping %d patch%s from \"%s\"\n", len(patches), pluralize(patches, "es"), rootUserpath)
+		fmt.Fprintf(cio.Err, "Popping %d patch%s from \"%s\"\n", len(patches), pluralize(patches, "es"), rootUserpath)
 		// Process each patch in reverse order (last patch first)
 		patchContent := make([]string, len(patches))
 		patchDescription := make([]string, len(patches))
@@ -141,7 +154,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 			if err := patchManager.RemovePatch(patchInfo.Name); err != nil {
 				return fmt.Errorf("failed to remove patch %s: %w", patchInfo.Name, err)
 			}
-			fmt.Fprintf(cmd.OutOrStderr(), "Popping patch \"%s\"\n", patchInfo.Name)
+			fmt.Fprintf(cio.Err, "Popping patch \"%s\"\n", patchInfo.Name)
 		}
 		_, err = jj.Run(ctx, "new", chain.Base.ID)
 		if err != nil {
@@ -186,15 +199,15 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		if _, err := jj.Run(ctx, restoreArgs...); err != nil {
 			return fmt.Errorf("failed to restore commit position: %w", err)
 		}
-		fmt.Fprintf(cmd.OutOrStderr(), "Successfully popped %d patch%s\n", len(patches), pluralize(patches, "es"))
+		fmt.Fprintf(cio.Err, "Successfully popped %d patch%s\n", len(patches), pluralize(patches, "es"))
 		return nil
 	}()
 	if err != nil {
-		fmt.Fprint(cmd.OutOrStderr(), "encountered error. rolling back... ")
+		fmt.Fprint(cio.Err, "encountered error. rolling back... ")
 		if _, rollbackErr := jj.Run(ctx, "op", "restore", baseOp); rollbackErr != nil {
-			fmt.Fprintf(cmd.OutOrStderr(), "failed: %v\n", rollbackErr)
+			fmt.Fprintf(cio.Err, "failed: %v\n", rollbackErr)
 		} else {
-			fmt.Fprintln(cmd.OutOrStderr(), "done")
+			fmt.Fprintln(cio.Err, "done")
 		}
 	}
 	return err
