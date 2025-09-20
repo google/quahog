@@ -4,6 +4,7 @@
 package quahog
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"slices"
@@ -44,13 +45,13 @@ type ChainOptions struct {
 	NoCreateBase bool
 }
 
-func NewPatchChain(jj jjvcs.Client, opts ChainOptions) (*PatchChain, error) {
+func NewPatchChain(ctx context.Context, jj jjvcs.Client, opts ChainOptions) (*PatchChain, error) {
 	// TODO: Offer a mode where RootRelpath isn't required since `pop --root` is only case we _really_ need to specify it
 	if opts.RootRelpath == "" {
 		return nil, fmt.Errorf("root relpath required")
 	}
 	var originID string
-	if c, err := jj.Rev(opts.OriginRev); err != nil {
+	if c, err := jj.Rev(ctx, opts.OriginRev); err != nil {
 		return nil, err
 	} else if !c.IsEmpty || len(c.Parents) != 1 {
 		originID = c.ID
@@ -59,7 +60,7 @@ func NewPatchChain(jj jjvcs.Client, opts ChainOptions) (*PatchChain, error) {
 	}
 	// Revset captures all ancestors and descendents of our target rev, from oldest to newest.
 	revset := fmt.Sprintf("descendants(%s)|(heads(immutable())::ancestors(%s))", originID, originID)
-	commits, err := jj.Revs(revset)
+	commits, err := jj.Revs(ctx, revset)
 	if err != nil {
 		return nil, err
 	}
@@ -155,18 +156,18 @@ func NewPatchChain(jj jjvcs.Client, opts ChainOptions) (*PatchChain, error) {
 			args = append(args, "--insert-after", originID)
 		}
 		// TODO: Should we add an --insert-after to get the base to appear pre-octopus?
-		_, err := jj.Run(args...)
+		_, err := jj.Run(ctx, args...)
 		if err != nil {
 			return nil, err
 		}
 		// TODO: Fix chain.Patches[0].Parents which will now be stale
-		c, err := jj.Rev("@")
+		c, err := jj.Rev(ctx, "@")
 		if err != nil {
 			return nil, err
 		}
 		chain.Base = c
 	} else {
-		_, err := jj.Run("edit", chain.Base.ID)
+		_, err := jj.Run(ctx, "edit", chain.Base.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -198,18 +199,18 @@ func PatchMetadata(c *jjvcs.Change) (name, description string, err error) {
 }
 
 // PatchContent generates a patch from a commit
-func PatchContent(jj jjvcs.Client, c *jjvcs.Change, repoAbspath, repoRelpath string) (string, error) {
+func PatchContent(ctx context.Context, jj jjvcs.Client, c *jjvcs.Change, repoAbspath, repoRelpath string) (string, error) {
 	_, desc, err := PatchMetadata(c)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate patch metadata: %w", err)
 	}
 	// Generate diff for the commit
 	// TODO: Do this a bit more efficiently than doing two separate diffs.
-	diffWhole, err := jj.Run("diff", "--git", "-r", c.ID)
+	diffWhole, err := jj.Run(ctx, "diff", "--git", "-r", c.ID)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate diff: %w", err)
 	}
-	diff, err := jj.Run("diff", "--git", "-r", c.ID, "--", repoAbspath)
+	diff, err := jj.Run(ctx, "diff", "--git", "-r", c.ID, "--", repoAbspath)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate diff: %w", err)
 	}

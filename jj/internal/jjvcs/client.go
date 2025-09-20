@@ -5,6 +5,7 @@ package jjvcs
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -23,11 +24,11 @@ type Change struct {
 }
 
 type Client interface {
-	Run(...string) (string, error)
-	Root() (string, error)
-	Revs(string) ([]*Change, error)
-	Rev(string) (*Change, error)
-	Squash([]string, string) error
+	Run(context.Context, ...string) (string, error)
+	Root(context.Context) (string, error)
+	Revs(context.Context, string) ([]*Change, error)
+	Rev(context.Context, string) (*Change, error)
+	Squash(context.Context, []string, string) error
 }
 type client struct{}
 
@@ -36,8 +37,8 @@ func NewClient() Client {
 }
 
 // Run executes a jj command and returns its output.
-func (j *client) Run(args ...string) (string, error) {
-	cmd := exec.Command("jj", args...)
+func (j *client) Run(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "jj", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -50,15 +51,15 @@ func (j *client) Run(args ...string) (string, error) {
 }
 
 // Root returns the repo root path
-func (j *client) Root() (abspath string, err error) {
-	rootPath, err := j.Run("root")
+func (j *client) Root(ctx context.Context) (abspath string, err error) {
+	rootPath, err := j.Run(ctx, "root")
 	if err != nil {
 		return "", fmt.Errorf("failed to get root path: %w", err)
 	}
 	return strings.TrimSpace(rootPath), nil
 }
 
-func (j *client) Revs(revset string) ([]*Change, error) {
+func (j *client) Revs(ctx context.Context, revset string) ([]*Change, error) {
 	tplParts := []string{
 		"change_id.short()",
 		"conflict",
@@ -70,7 +71,7 @@ func (j *client) Revs(revset string) ([]*Change, error) {
 		`"\n"`,
 	}
 	template := strings.Join(tplParts, `++" "++`)
-	out, err := j.Run("log", "--no-graph", "--template", template, "-r", revset)
+	out, err := j.Run(ctx, "log", "--no-graph", "--template", template, "-r", revset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit info for %s: %w", revset, err)
 	}
@@ -97,8 +98,8 @@ func (j *client) Revs(revset string) ([]*Change, error) {
 	return commits, nil
 }
 
-func (j *client) Rev(revset string) (*Change, error) {
-	c, err := j.Revs(revset)
+func (j *client) Rev(ctx context.Context, revset string) (*Change, error) {
+	c, err := j.Revs(ctx, revset)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +110,7 @@ func (j *client) Rev(revset string) (*Change, error) {
 }
 
 // Squash squashes multiple commits into a base commit
-func (j *client) Squash(commitIDs []string, baseCommit string) error {
+func (j *client) Squash(ctx context.Context, commitIDs []string, baseCommit string) error {
 	if len(commitIDs) == 0 {
 		return nil
 	}
@@ -119,6 +120,6 @@ func (j *client) Squash(commitIDs []string, baseCommit string) error {
 		args = append(args, "--into", baseCommit)
 	}
 	args = append(args, "--from", strings.Join(commitIDs, "|"))
-	_, err := j.Run(args...)
+	_, err := j.Run(ctx, args...)
 	return err
 }

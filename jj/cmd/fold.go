@@ -53,6 +53,7 @@ func init() {
 }
 
 func runFold(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	// Resolve root path
 	rootUserpath := filepath.Clean(foldRoot)
 	rootAbspath, err := filepath.Abs(rootUserpath)
@@ -68,7 +69,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
 	}
 	jj := jjvcs.NewClient()
-	repoRoot, err := jj.Root()
+	repoRoot, err := jj.Root(ctx)
 	if err != nil {
 		return err
 	}
@@ -76,14 +77,14 @@ func runFold(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to determine repo relative path: %w", err)
 	}
-	baseOp, err := jj.Run("op", "log", "--template", "id", "--limit", "1", "--no-graph")
+	baseOp, err := jj.Run(ctx, "op", "log", "--template", "id", "--limit", "1", "--no-graph")
 	if err != nil {
 		return fmt.Errorf("failed to determine base op: %w", err)
 	}
 	baseOp = strings.TrimSpace(baseOp)
 	var originRev *jjvcs.Change
 	var originChild bool
-	if originRevs, err := jj.Revs("@|@-"); err != nil {
+	if originRevs, err := jj.Revs(ctx, "@|@-"); err != nil {
 		return err
 	} else if !originRevs[0].IsEmpty || len(originRevs[0].Parents) != 1 {
 		originRev = originRevs[0]
@@ -93,7 +94,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 	}
 	var foldToRev *jjvcs.Change
 	if foldTo != "" {
-		foldToRev, err = jj.Rev(foldTo)
+		foldToRev, err = jj.Rev(ctx, foldTo)
 		if err != nil {
 			return err
 		}
@@ -103,7 +104,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 	}
 	var foldRevs []*jjvcs.Change
 	if foldRev != "" {
-		foldRevs, err = jj.Revs(foldRev)
+		foldRevs, err = jj.Revs(ctx, foldRev)
 		if err != nil {
 			return err
 		}
@@ -121,7 +122,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 		rev = originRev.ID
 	}
 	err = func() error {
-		chain, err := quahog.NewPatchChain(jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
+		chain, err := quahog.NewPatchChain(ctx, jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
 		if err != nil {
 			return fmt.Errorf("failed to build patch chain: %w", err)
 		}
@@ -178,7 +179,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 			if len(commit.Parents) > 1 {
 				return fmt.Errorf("[unimplemented] patch commit for %s has multiple parents", name)
 			}
-			content, err := quahog.PatchContent(jj, commit, rootAbspath, rootRelRepo)
+			content, err := quahog.PatchContent(ctx, jj, commit, rootAbspath, rootRelRepo)
 			if err != nil {
 				return fmt.Errorf("generating patch for %s: %w", name, err)
 			}
@@ -194,7 +195,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 		for _, commit := range commits {
 			commitIDs = append(commitIDs, commit.ID)
 		}
-		if err := jj.Squash(commitIDs, chain.Base.ID); err != nil {
+		if err := jj.Squash(ctx, commitIDs, chain.Base.ID); err != nil {
 			return fmt.Errorf("failed to squash commits: %w", err)
 		}
 		// Restore commit position
@@ -206,7 +207,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 		} else {
 			restoreArgs = []string{"edit", originRev.ID}
 		}
-		if _, err := jj.Run(restoreArgs...); err != nil {
+		if _, err := jj.Run(ctx, restoreArgs...); err != nil {
 			return fmt.Errorf("failed to restore commit position: %w", err)
 		}
 		fmt.Fprintf(cmd.OutOrStderr(), "Successfully folded %d patch%s\n", len(commits), pluralize(commits, "es"))
@@ -214,7 +215,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 	}()
 	if err != nil {
 		fmt.Fprint(cmd.OutOrStderr(), "encountered error. rolling back... ")
-		if _, rollbackErr := jj.Run("op", "restore", baseOp); rollbackErr != nil {
+		if _, rollbackErr := jj.Run(ctx, "op", "restore", baseOp); rollbackErr != nil {
 			fmt.Fprintf(cmd.OutOrStderr(), "failed: %v\n", rollbackErr)
 		} else {
 			fmt.Fprintln(cmd.OutOrStderr(), "done")

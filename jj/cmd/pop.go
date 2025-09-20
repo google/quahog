@@ -50,6 +50,7 @@ func init() {
 }
 
 func runPop(cmd *cobra.Command, args []string) (err error) {
+	ctx := cmd.Context()
 	// Resolve root path
 	rootUserpath := filepath.Clean(popRoot)
 	rootAbspath, _ := filepath.Abs(rootUserpath)
@@ -66,7 +67,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("%s: no such file", seriesFile)
 	}
 	jj := jjvcs.NewClient()
-	repoRoot, err := jj.Root()
+	repoRoot, err := jj.Root(ctx)
 	if err != nil {
 		return err
 	}
@@ -74,7 +75,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to determine repo relative path: %w", err)
 	}
-	baseOp, err := jj.Run("op", "log", "--template", "id", "--limit", "1", "--no-graph")
+	baseOp, err := jj.Run(ctx, "op", "log", "--template", "id", "--limit", "1", "--no-graph")
 	if err != nil {
 		return fmt.Errorf("failed to determine base op: %w", err)
 	}
@@ -82,7 +83,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	patchManager := quilt.NewManager(rootAbspath)
 	var originRev *jjvcs.Change
 	var originChild bool
-	if originRevs, err := jj.Revs("@|@-"); err != nil {
+	if originRevs, err := jj.Revs(ctx, "@|@-"); err != nil {
 		return err
 	} else if !originRevs[0].IsEmpty || len(originRevs[0].Parents) != 1 {
 		originRev = originRevs[0]
@@ -92,7 +93,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	}
 	var popFromRev *jjvcs.Change
 	if popFrom != "" {
-		popFromRev, err = jj.Rev(popFrom)
+		popFromRev, err = jj.Rev(ctx, popFrom)
 		if err != nil {
 			return err
 		}
@@ -109,7 +110,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	// Must rollback from this point forward
 	err = func() error {
 		// TODO: We should be able to non-desctructively construct patch chain i.e. make base commit separately.
-		chain, err := quahog.NewPatchChain(jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
+		chain, err := quahog.NewPatchChain(ctx, jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
 		if err != nil {
 			return fmt.Errorf("failed to build patch chain: %w", err)
 		}
@@ -142,18 +143,18 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 			}
 			fmt.Fprintf(cmd.OutOrStderr(), "Popping patch \"%s\"\n", patchInfo.Name)
 		}
-		_, err = jj.Run("new", chain.Base.ID)
+		_, err = jj.Run(ctx, "new", chain.Base.ID)
 		if err != nil {
 			return err
 		}
 		{
 			// Move working copy change before the patch so subsequnt patches are created at the start of the chain.
 			var workingCopy *jjvcs.Change
-			if workingCopy, err = jj.Rev("@"); err != nil {
+			if workingCopy, err = jj.Rev(ctx, "@"); err != nil {
 				return err
 			}
 			if len(chain.Patches) > 0 {
-				_, err = jj.Run("rebase", "-r", workingCopy.ID, "--insert-before", chain.Patches[0].ID)
+				_, err = jj.Run(ctx, "rebase", "-r", workingCopy.ID, "--insert-before", chain.Patches[0].ID)
 				if err != nil {
 					return err
 				}
@@ -168,7 +169,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 			if description := patchDescription[i]; description != "" {
 				commitMsg += "\n\n" + description
 			}
-			_, err = jj.Run("commit", "--message", commitMsg)
+			_, err = jj.Run(ctx, "commit", "--message", commitMsg)
 			if err != nil {
 				return fmt.Errorf("failed to commit patch %s: %w", patchInfo.Name, err)
 			}
@@ -182,7 +183,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 		} else {
 			restoreArgs = []string{"edit", originRev.ID}
 		}
-		if _, err := jj.Run(restoreArgs...); err != nil {
+		if _, err := jj.Run(ctx, restoreArgs...); err != nil {
 			return fmt.Errorf("failed to restore commit position: %w", err)
 		}
 		fmt.Fprintf(cmd.OutOrStderr(), "Successfully popped %d patch%s\n", len(patches), pluralize(patches, "es"))
@@ -190,7 +191,7 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	}()
 	if err != nil {
 		fmt.Fprint(cmd.OutOrStderr(), "encountered error. rolling back... ")
-		if _, rollbackErr := jj.Run("op", "restore", baseOp); rollbackErr != nil {
+		if _, rollbackErr := jj.Run(ctx, "op", "restore", baseOp); rollbackErr != nil {
 			fmt.Fprintf(cmd.OutOrStderr(), "failed: %v\n", rollbackErr)
 		} else {
 			fmt.Fprintln(cmd.OutOrStderr(), "done")
