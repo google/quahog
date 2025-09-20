@@ -4,7 +4,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -62,7 +64,7 @@ func runFold(cmd *cobra.Command, args []string) error {
 	}
 	// Verify patches directory exists
 	patchesDir := filepath.Join(rootAbspath, "patches")
-	if _, err := os.Stat(patchesDir); os.IsNotExist(err) {
+	if _, err := os.Stat(patchesDir); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
 	}
 	jj := jjvcs.NewClient()

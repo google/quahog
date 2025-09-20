@@ -4,7 +4,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -56,11 +58,11 @@ func runPop(cmd *cobra.Command, args []string) (err error) {
 	}
 	// Verify patches directory exists
 	patchesDir := filepath.Join(rootAbspath, "patches")
-	if _, err := os.Stat(patchesDir); os.IsNotExist(err) {
+	if _, err := os.Stat(patchesDir); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
 	}
 	seriesFile := filepath.Join(patchesDir, "series")
-	if _, err := os.Stat(seriesFile); os.IsNotExist(err) {
+	if _, err := os.Stat(seriesFile); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: no such file", seriesFile)
 	}
 	jj := jjvcs.NewClient()

@@ -6,7 +6,9 @@ package quilt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,10 +119,9 @@ func (q *Manager) WritePatchFiles(names []string, content []string) error {
 // readSeries reads the series file and returns the list of patches
 func (q *Manager) readSeries() ([]string, error) {
 	file, err := os.Open(q.seriesFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
 	defer file.Close()
