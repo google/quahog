@@ -21,7 +21,7 @@ $ jj git init --quiet && \
 $ # Step 2: Fold the patch from test-project
 $ cd test-project »
 $ quahog fold --root . --count 1 »
-Folding 1 patch into "."
+Folding 1 patch into "test-project"
 Successfully folded 1 patch
 
 $ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »
@@ -33,7 +33,7 @@ o  Initial commit
 $ # Step 3: Pop the chain without base from test-project
 $ jj describe --quiet -m "Not a base commit" -r @- »
 $ quahog pop --root . --count 1 »
-Popping 1 patch from "."
+Popping 1 patch from "test-project"
 Popping patch "file.diff"
 Successfully popped 1 patch
 

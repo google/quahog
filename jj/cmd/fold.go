@@ -162,7 +162,7 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 			return nil
 		}
 		commits := chain.Patches[:toFold]
-		fmt.Fprintf(cio.Err, "Folding %d patch%s into \"%s\"\n", len(commits), pluralize(commits, "es"), rootUserpath)
+		fmt.Fprintf(cio.Err, "Folding %d patch%s into \"%s\"\n", len(commits), pluralize(commits, "es"), rootRelRepo)
 		// Generate patches from commits
 		patchManager := quilt.NewManager(rootAbspath)
 		var patchNames, patchContent []string

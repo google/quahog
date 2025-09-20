@@ -141,7 +141,7 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 			fmt.Fprintln(cio.Err, "No patches to pop")
 			return nil
 		}
-		fmt.Fprintf(cio.Err, "Popping %d patch%s from \"%s\"\n", len(patches), pluralize(patches, "es"), rootUserpath)
+		fmt.Fprintf(cio.Err, "Popping %d patch%s from \"%s\"\n", len(patches), pluralize(patches, "es"), rootRelRepo)
 		// Process each patch in reverse order (last patch first)
 		patchContent := make([]string, len(patches))
 		patchDescription := make([]string, len(patches))
