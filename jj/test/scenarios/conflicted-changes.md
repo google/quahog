@@ -16,7 +16,7 @@ Initialized repo in "."
 $ jj commit --quiet -m "Initial commit" && \
   (echo foo > test-project/foo) && jj commit --quiet -m "[PATCH] foo1" && jj prev --quiet && \
   (echo bar > test-project/foo) && jj commit --quiet -m "[PATCH] foo2" && \
-  jj rebase --quiet -r 'all:description("foo2")::' --insert-after 'description("foo1")' »
+  jj rebase --quiet -r 'description("foo2")::' --insert-after 'description("foo1")' »
 $ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »
 @
 x  [PATCH] foo2
