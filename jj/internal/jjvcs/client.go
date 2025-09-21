@@ -30,7 +30,7 @@ type Client interface {
 	Rev(context.Context, string) (*Change, error)
 	Squash(context.Context, []string, string) error
 }
-type client struct{
+type client struct {
 	repository string
 }
 
