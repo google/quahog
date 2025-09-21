@@ -15,6 +15,7 @@ jobs:
     strategy:
       matrix:
         go-version: ["1.24", "1.25"]
+        jj-version: ["0.32.0"]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,8 +28,12 @@ jobs:
       - name: Build
         run: go build -C jj -v ./...
 
-      - name: Test
-        run: go test -C jj -v ./...
+      - name: Test using jj ${{matrix.jj-version}}
+        run: |
+          wget -O - https://github.com/jj-vcs/jj/releases/download/v${{matrix.jj-version}}/jj-v${{matrix.jj-version}}-x86_64-unknown-linux-musl.tar.gz | tar xzvf - -C /usr/local/bin ./jj
+          jj config set --user user.name "Place Holder"
+          jj config set --user user.email "holder@example.com"
+          go test -C jj -v ./...
 
       - name: Vet
         run: go vet -C jj -v ./...
