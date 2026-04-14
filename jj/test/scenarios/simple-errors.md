@@ -12,8 +12,7 @@ patches/series: ""
 **Test:**
 
 ```bash
-$ jj git init »
-Initialized repo in "."
+$ jj git init --quiet »
 $ jj commit --quiet -m "Initial commit" »
 $ # Test non-existent directory
 $ quahog fold --root patches --count 1 »

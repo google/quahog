@@ -14,8 +14,7 @@ patches/series: ""
 **Test:**
 
 ```bash
-$ jj git init »
-Initialized repo in "."
+$ jj git init --quiet »
 $ jj commit --quiet -m "Initial commit" »
 $ # Step 1: Create patch commit
 $ echo "modified content" > file.txt »

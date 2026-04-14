@@ -11,8 +11,7 @@ test-project/patches/series: ""
 **Test:**
 
 ```bash
-$ jj git init »
-Initialized repo in "."
+$ jj git init --quiet »
 $ jj commit --quiet -m "Initial commit" && \
   (echo foo > foo) && jj commit --quiet -m "[PATCH] foo" »
 $ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »

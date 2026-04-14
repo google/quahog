@@ -14,8 +14,7 @@ test-project/patches/series: ""
 **Test:**
 
 ```bash
-$ jj git init »
-Initialized repo in "."
+$ jj git init --quiet »
 $ jj commit --quiet -m "Initial commit" && \
   touch test-project/foo && jj commit --quiet -m "[PATCH] Foo" && jj prev --quiet && \
   touch test-project/bar && jj commit --quiet -m "[PATCH] Bar" && jj prev --quiet && \
