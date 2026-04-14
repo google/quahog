@@ -25,15 +25,45 @@ type Manager struct {
 	seriesFile string
 }
 
+// NewManager creates a new Manager for the given root path.
+//
+// The patches directory and series file names can be overridden via the
+// QUILT_PATCHES and QUILT_SERIES environment variables respectively. Absolute
+// paths are used as-is, matching quilt(1) behavior:
+// https://man7.org/linux/man-pages/man1/quilt.1.html
 func NewManager(rootPath string) *Manager {
-	patchesDir := filepath.Join(rootPath, "patches")
-	seriesFile := filepath.Join(patchesDir, "series")
+	patchesDirName := "patches"
+	if v := os.Getenv("QUILT_PATCHES"); v != "" {
+		patchesDirName = v
+	}
+	seriesFileName := "series"
+	if v := os.Getenv("QUILT_SERIES"); v != "" {
+		seriesFileName = v
+	}
+	patchesDir := patchesDirName
+	if !filepath.IsAbs(patchesDir) {
+		patchesDir = filepath.Join(rootPath, patchesDirName)
+	}
+	seriesFile := seriesFileName
+	if !filepath.IsAbs(seriesFile) {
+		seriesFile = filepath.Join(patchesDir, seriesFileName)
+	}
 
 	return &Manager{
 		rootPath:   rootPath,
 		patchesDir: patchesDir,
 		seriesFile: seriesFile,
 	}
+}
+
+// PatchesDir returns the resolved patches directory path.
+func (q *Manager) PatchesDir() string {
+	return q.patchesDir
+}
+
+// SeriesFile returns the resolved series file path.
+func (q *Manager) SeriesFile() string {
+	return q.seriesFile
 }
 
 // GetPatchesToPop returns patches that should be popped based on count or all flag
