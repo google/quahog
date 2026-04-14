@@ -130,7 +130,7 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	}
 	// Must rollback from this point forward
 	err = func() error {
-		// TODO: We should be able to non-desctructively construct patch chain i.e. make base commit separately.
+		// TODO: We should be able to non-destructively construct patch chain i.e. make base commit separately.
 		chain, err := quahog.NewPatchChain(ctx, jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
 		if err != nil {
 			return fmt.Errorf("failed to build patch chain: %w", err)
@@ -170,7 +170,7 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 			return err
 		}
 		{
-			// Move working copy change before the patch so subsequnt patches are created at the start of the chain.
+			// Move working copy change before the patch so subsequent patches are created at the start of the chain.
 			var workingCopy *jjvcs.Change
 			if workingCopy, err = jj.Rev(ctx, "@"); err != nil {
 				return err

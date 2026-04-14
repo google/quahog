@@ -174,7 +174,7 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 		for _, commit := range commits {
 			name, _, err := quahog.PatchMetadata(commit)
 			if err != nil {
-				return fmt.Errorf("parsing commit metadata: %w ", err)
+				return fmt.Errorf("parsing commit metadata: %w", err)
 			}
 			// Validate patch commit
 			if commit.IsConflicted {
@@ -188,7 +188,7 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 				continue // Skip this commit as a no-op
 			}
 			// TODO: This is overly-pessimistic but prevents a tricky bug that needs to be properly handled.
-			// If a patch has multipl parents, there may be other modifications to
+			// If a patch has multiple parents, there may be other modifications to
 			// the patched files merged in. Since the patch isn't in conflict, they
 			// are disjoint changes BUT they can still impact the diff chunk locators
 			// which would result in irreversible patch files. To avoid this, we

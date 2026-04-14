@@ -349,7 +349,7 @@ func FormatGitDiff(diff, rootPath string) string {
 			result.WriteString("+++ b/" + path + "\n")
 		} else if strings.HasPrefix(line, "@@ ") {
 			// Quilt generates diffs that strip trailing whitespace from context lines.
-			// Fig's diffs keep the trailing whitespace by default, so we remove that
+			// jj's diffs keep the trailing whitespace by default, so we remove that
 			// here. This seems to only be configured for context lines, not all lines.
 			result.WriteString(strings.TrimRight(line, " \t") + "\n")
 		} else {

@@ -20,7 +20,7 @@ o  [PATCH] foo
 o  Initial commit
 +
 
-$ # Succeeds when fold doesn't cover the conflicted change
+$ # Fails when patch contains changes outside the root
 $ quahog fold --root test-project --count 1 »
 Folding 1 patch into "test-project"
 encountered error. rolling back... done

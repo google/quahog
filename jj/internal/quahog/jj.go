@@ -58,7 +58,7 @@ func NewPatchChain(ctx context.Context, jj jjvcs.Client, opts ChainOptions) (*Pa
 	} else {
 		originID = c.Parents[0]
 	}
-	// Revset captures all ancestors and descendents of our target rev, from oldest to newest.
+	// Revset captures all ancestors and descendants of our target rev, from oldest to newest.
 	revset := fmt.Sprintf("descendants(%s)|(heads(immutable())::ancestors(%s))", originID, originID)
 	commits, err := jj.Revs(ctx, revset)
 	if err != nil {
