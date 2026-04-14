@@ -33,6 +33,11 @@ func NewScenarioExecutor(t *testing.T) (*ScenarioExecutor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
+	// Resolve symlinks so template paths match resolved paths in error messages
+	tempDir, err = filepath.EvalSymlinks(tempDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve temp directory: %w", err)
+	}
 	// Write a jj config file to suppress name/email warnings in tests.
 	jjConfigPath := filepath.Join(tempDir, ".jjconfig.toml")
 	jjConfig := "[user]\nname = \"Test User\"\nemail = \"test@example.com\"\n"
