@@ -156,6 +156,7 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 			if err != nil {
 				return fmt.Errorf("failed to read patch %s: %w", patchInfo.Name, err)
 			}
+			patchContent[i] = quilt.CanonicalizeDiffPaths(patchContent[i], rootRelRepo)
 			if err := quilt.ApplyPatchReverse(patchContent[i], rootAbspath); err != nil {
 				return fmt.Errorf("failed to reverse patch %s: %w", patchInfo.Name, err)
 			}
