@@ -46,8 +46,8 @@ Popping patch "test-patch-1.diff"
 Successfully popped 1 patch
 
 $ # Verify patch file was removed
-$ ls patches/test-patch-1.diff »
-ls: cannot access 'patches/test-patch-1.diff': No such file or directory
+$ test -f patches/test-patch-1.diff && echo "exists" || echo "removed" »
+removed
 
 $ # Verify series file is empty
 $ cat patches/series »
