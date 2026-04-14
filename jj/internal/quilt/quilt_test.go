@@ -82,3 +82,96 @@ func TestNewManagerPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestCanonicalizeDiffPaths(t *testing.T) {
+	tests := []struct {
+		name        string
+		content     string
+		rootRelRepo string
+		want        string
+	}{
+		{
+			name:        "already canonical with a/b prefix",
+			content:     "--- a/file.py\n+++ b/file.py\n",
+			rootRelRepo: "foo",
+			want:        "--- a/file.py\n+++ b/file.py\n",
+		},
+		{
+			name:        "already canonical bare",
+			content:     "--- file.py\n+++ file.py\n",
+			rootRelRepo: "foo",
+			want:        "--- file.py\n+++ file.py\n",
+		},
+		{
+			name:        "repo-relative with a/b prefix",
+			content:     "--- a/foo/file.py\n+++ b/foo/file.py\n",
+			rootRelRepo: "foo",
+			want:        "--- a/file.py\n+++ b/file.py\n",
+		},
+		{
+			name:        "repo-relative bare",
+			content:     "--- foo/file.py\n+++ foo/file.py\n",
+			rootRelRepo: "foo",
+			want:        "--- file.py\n+++ file.py\n",
+		},
+		{
+			name:        "nested rootRelRepo",
+			content:     "--- a/path/to/import/x.py\n+++ b/path/to/import/x.py\n",
+			rootRelRepo: "path/to/import",
+			want:        "--- a/x.py\n+++ b/x.py\n",
+		},
+		{
+			name:        "mixed --- and +++ in one patch",
+			content:     "--- a/foo/file.py\n+++ b/foo/file.py\n@@ -1,1 +1,1 @@\n-old\n+new\n",
+			rootRelRepo: "foo",
+			want:        "--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new\n",
+		},
+		{
+			name:        "substring but not prefix",
+			content:     "--- a/other/foo/file.py\n+++ b/other/foo/file.py\n",
+			rootRelRepo: "foo",
+			want:        "--- a/other/foo/file.py\n+++ b/other/foo/file.py\n",
+		},
+		{
+			name:        "body context line with dashes",
+			content:     "--- a/foo/file.py\n+++ b/foo/file.py\n@@ -1,2 +1,2 @@\n-some deleted line\n+some added line\n",
+			rootRelRepo: "foo",
+			want:        "--- a/file.py\n+++ b/file.py\n@@ -1,2 +1,2 @@\n-some deleted line\n+some added line\n",
+		},
+		{
+			name:        "rootRelRepo is dot",
+			content:     "--- a/file.py\n+++ b/file.py\n",
+			rootRelRepo: ".",
+			want:        "--- a/file.py\n+++ b/file.py\n",
+		},
+		{
+			name:        "rootRelRepo empty",
+			content:     "--- a/file.py\n+++ b/file.py\n",
+			rootRelRepo: "",
+			want:        "--- a/file.py\n+++ b/file.py\n",
+		},
+		{
+			name:        "rootRelRepo with trailing slash",
+			content:     "--- a/foo/file.py\n+++ b/foo/file.py\n",
+			rootRelRepo: "foo/",
+			want:        "--- a/file.py\n+++ b/file.py\n",
+		},
+		{
+			name: "multi-file patch",
+			content: "--- a/foo/file1.py\n+++ b/foo/file1.py\n@@ -1,1 +1,1 @@\n-old\n+new\n" +
+				"--- a/foo/file2.py\n+++ b/foo/file2.py\n@@ -1,1 +1,1 @@\n-old2\n+new2\n",
+			rootRelRepo: "foo",
+			want: "--- a/file1.py\n+++ b/file1.py\n@@ -1,1 +1,1 @@\n-old\n+new\n" +
+				"--- a/file2.py\n+++ b/file2.py\n@@ -1,1 +1,1 @@\n-old2\n+new2\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CanonicalizeDiffPaths(tt.content, tt.rootRelRepo)
+			if got != tt.want {
+				t.Errorf("CanonicalizeDiffPaths() =\n%q\nwant:\n%q", got, tt.want)
+			}
+		})
+	}
+}

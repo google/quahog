@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -275,7 +276,27 @@ func (*Manager) copyFile(src, dst string) error {
 	return err
 }
 
-// ApplyPatch applies a patch to the working directory using git apply
+// CanonicalizeDiffPaths rewrites diff header paths to be subdir-relative.
+// Accepts patches with paths in either form:
+//
+//	--- a/<rootRelRepo>/file  →  --- a/file
+//	--- <rootRelRepo>/file    →  --- file
+//	--- a/file                →  unchanged
+//
+// The optional a/ or b/ prefix is preserved. The trailing slash after
+// rootRelRepo is consumed, avoiding the double-slash artifact.
+func CanonicalizeDiffPaths(content, rootRelRepo string) string {
+	rootRelRepo = strings.TrimSuffix(filepath.ToSlash(rootRelRepo), "/")
+	if rootRelRepo == "" || rootRelRepo == "." {
+		return content
+	}
+	// Match --- or +++ at start of line, then whitespace, optional a/ or b/ prefix,
+	// then the rootRelRepo followed by a slash.
+	re := regexp.MustCompile(`(?m)^(---|\+\+\+)(\s+)((?:a|b)/)?` + regexp.QuoteMeta(rootRelRepo) + `/`)
+	return re.ReplaceAllString(content, "${1}${2}${3}")
+}
+
+// ApplyPatch applies a patch to the working directory using git apply.
 func ApplyPatch(patchContent, rootPath string) error {
 	cmd := exec.Command("git", "apply", "-")
 	cmd.Dir = rootPath
@@ -288,7 +309,7 @@ func ApplyPatch(patchContent, rootPath string) error {
 	return nil
 }
 
-// ApplyPatchReverse applies a patch in reverse to remove changes using git apply
+// ApplyPatchReverse applies a patch in reverse to remove changes using git apply.
 func ApplyPatchReverse(patchContent, rootPath string) error {
 	cmd := exec.Command("git", "apply", "--reverse", "-")
 	cmd.Dir = rootPath
