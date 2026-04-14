@@ -37,7 +37,7 @@ Popping 1 patch from "test-project"
 Popping patch "file.diff"
 Successfully popped 1 patch
 
-$ jj new --quiet -r 'description("[PATCH]")' # FIXME »
+$ jj new --quiet -r 'subject(exact:"[PATCH] file.diff")' »
 $ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »
 @
 o  [PATCH] file.diff
