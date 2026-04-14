@@ -5,9 +5,7 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -85,9 +83,9 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 		return err
 	}
 	// Verify patches directory exists
-	patchesDir := filepath.Join(rootAbspath, "patches")
-	if _, err := os.Stat(patchesDir); errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
+	patchManager := quilt.NewManager(rootAbspath)
+	if _, err := os.Stat(patchManager.PatchesDir()); err != nil {
+		return fmt.Errorf("%s: patches directory does not exist", patchManager.PatchesDir())
 	}
 	repoRoot, err = filepath.EvalSymlinks(repoRoot)
 	if err != nil {
@@ -172,7 +170,6 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 		commits := chain.Patches[:toFold]
 		fmt.Fprintf(cio.Err, "Folding %d patch%s into \"%s\"\n", len(commits), pluralize(commits, "es"), rootRelRepo)
 		// Generate patches from commits
-		patchManager := quilt.NewManager(rootAbspath)
 		var patchNames, patchContent []string
 		for _, commit := range commits {
 			name, _, err := quahog.PatchMetadata(commit)

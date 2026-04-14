@@ -16,7 +16,7 @@ $ jj git init --quiet »
 $ jj commit --quiet -m "Initial commit" »
 $ # Test non-existent directory
 $ quahog fold --root patches --count 1 »
-Error: {{.TempDir}}/patches: does not contain patches/ subdirectory
+Error: {{.TempDir}}/patches/patches: patches directory does not exist
 Usage:
   quahog fold [flags]
 

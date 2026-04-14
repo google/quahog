@@ -81,14 +81,13 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	if err != nil {
 		return err
 	}
-	// Verify patches directory exists
-	patchesDir := filepath.Join(rootAbspath, "patches")
-	if _, err := os.Stat(patchesDir); errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
+	// Verify patches directory and series file exist
+	patchManager := quilt.NewManager(rootAbspath)
+	if _, err := os.Stat(patchManager.PatchesDir()); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%s: patches directory does not exist", patchManager.PatchesDir())
 	}
-	seriesFile := filepath.Join(patchesDir, "series")
-	if _, err := os.Stat(seriesFile); errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%s: no such file", seriesFile)
+	if _, err := os.Stat(patchManager.SeriesFile()); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%s: no such file", patchManager.SeriesFile())
 	}
 	repoRoot, err = filepath.EvalSymlinks(repoRoot)
 	if err != nil {
@@ -103,7 +102,6 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 		return fmt.Errorf("failed to determine base op: %w", err)
 	}
 	baseOp = strings.TrimSpace(baseOp)
-	patchManager := quilt.NewManager(rootAbspath)
 	var originRev *jjvcs.Change
 	var originChild bool
 	if originRevs, err := jj.Revs(ctx, "@|@-"); err != nil {
