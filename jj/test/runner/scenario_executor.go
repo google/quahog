@@ -20,10 +20,11 @@ import (
 
 // ScenarioExecutor runs simple shell-style tests.
 type ScenarioExecutor struct {
-	tempDir    string
-	execDir    string
-	t          *testing.T
-	lastOutput string
+	tempDir      string
+	execDir      string
+	jjConfigPath string
+	t            *testing.T
+	lastOutput   string
 }
 
 // NewScenarioExecutor creates a new simple test executor.
@@ -32,10 +33,17 @@ func NewScenarioExecutor(t *testing.T) (*ScenarioExecutor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
+	// Write a jj config file to suppress name/email warnings in tests.
+	jjConfigPath := filepath.Join(tempDir, ".jjconfig.toml")
+	jjConfig := "[user]\nname = \"Test User\"\nemail = \"test@example.com\"\n"
+	if err := os.WriteFile(jjConfigPath, []byte(jjConfig), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write jj config: %w", err)
+	}
 	return &ScenarioExecutor{
-		tempDir: tempDir,
-		execDir: tempDir,
-		t:       t,
+		tempDir:      tempDir,
+		execDir:      tempDir,
+		jjConfigPath: jjConfigPath,
+		t:            t,
 	}, nil
 }
 
@@ -48,6 +56,11 @@ func (e *ScenarioExecutor) Cleanup() {
 
 // RunTest executes a complete simple test.
 func (e *ScenarioExecutor) RunTest(test *ScenarioTest) error {
+	// Set JJ_CONFIG so that jj subprocesses (spawned by both shell commands
+	// and in-process quahog commands) use our test user config. This is safe
+	// to race on because all executors set identical config content.
+	os.Setenv("JJ_CONFIG", e.jjConfigPath)
+
 	// Ensure dependencies are available.
 	if !e.isCommandAvailable("jj") {
 		e.t.Skip("jj command not available")
@@ -153,6 +166,7 @@ func (e *ScenarioExecutor) executeShellCommand(command string) error {
 
 	cmd := exec.Command("/bin/bash", "-c", command)
 	cmd.Dir = e.execDir
+	cmd.Env = append(os.Environ(), "JJ_CONFIG="+e.jjConfigPath)
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 	cmd.Run() // We don't return Run's error, as tests may expect failure.
