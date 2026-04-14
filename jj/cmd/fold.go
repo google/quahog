@@ -71,7 +71,7 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 	if err != nil {
 		return err
 	}
-	// Resolve root path
+	// Resolve root path, evaluating symlinks
 	rootUserpath := filepath.Clean(cfg.Root)
 	rootAbspath, err := filepath.Abs(rootUserpath)
 	if err != nil {
@@ -80,10 +80,18 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 	if _, err := os.Stat(rootAbspath); err != nil {
 		return err
 	}
+	rootAbspath, err = filepath.EvalSymlinks(rootAbspath)
+	if err != nil {
+		return err
+	}
 	// Verify patches directory exists
 	patchesDir := filepath.Join(rootAbspath, "patches")
 	if _, err := os.Stat(patchesDir); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: does not contain patches/ subdirectory", rootAbspath)
+	}
+	repoRoot, err = filepath.EvalSymlinks(repoRoot)
+	if err != nil {
+		return fmt.Errorf("failed to resolve repo root: %w", err)
 	}
 	rootRelRepo, err := filepath.Rel(repoRoot, rootAbspath)
 	if err != nil {

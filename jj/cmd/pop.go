@@ -71,10 +71,14 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	if err != nil {
 		return err
 	}
-	// Resolve root path
+	// Resolve root path, evaluating symlinks
 	rootUserpath := filepath.Clean(cfg.Root)
 	rootAbspath, _ := filepath.Abs(rootUserpath)
 	if _, err := os.Stat(rootAbspath); err != nil {
+		return err
+	}
+	rootAbspath, err = filepath.EvalSymlinks(rootAbspath)
+	if err != nil {
 		return err
 	}
 	// Verify patches directory exists
@@ -85,6 +89,10 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	seriesFile := filepath.Join(patchesDir, "series")
 	if _, err := os.Stat(seriesFile); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: no such file", seriesFile)
+	}
+	repoRoot, err = filepath.EvalSymlinks(repoRoot)
+	if err != nil {
+		return fmt.Errorf("failed to resolve repo root: %w", err)
 	}
 	rootRelRepo, err := filepath.Rel(repoRoot, rootAbspath)
 	if err != nil {
