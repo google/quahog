@@ -24,7 +24,9 @@ quahog =
 - **Quahog** is a Quilt-compatible patch management system that represents
   patches as Mercurial commits.
 - **Root** is a directory with Quilt-compatible patch files located in
-  `./patches/` and a series file at `./patches/series`.
+  `./patches/` and a series file at `./patches/series`. The patches directory
+  and series file names can be overridden via the `QUILT_PATCHES` and
+  `QUILT_SERIES` environment variables respectively.
 - **Patch Commit** is the Quahog representation of a patch denoted by a change
   description of the form `[PATCH] <path-filename>`. It contains no patch
   file: All contained diffs comprise the patch when folded.

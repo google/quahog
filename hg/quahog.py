@@ -62,6 +62,30 @@ PATCHDESC_RE = re.compile(rb'(do not submit\s*)?\[patch\]([^\r\n]+)',
                           re.IGNORECASE)
 
 
+_QuiltPaths = collections.namedtuple('_QuiltPaths', ['patchesdir', 'seriesfile'])
+
+
+def _quiltpaths(repo, rootpath):
+  """Resolve patches directory and series file, respecting QUILT_PATCHES/QUILT_SERIES.
+
+  Returned paths are always repo-relative. Relative env var values are joined
+  via repo.wvfs.reljoin; absolute values are validated and converted to
+  repo-relative via pathutil.canonpath (which raises Abort if the path falls
+  outside the repository).
+  """
+  patchesdirname = os.environb.get(b'QUILT_PATCHES', b'') or b'patches'
+  seriesfilename = os.environb.get(b'QUILT_SERIES', b'') or b'series'
+  if os.path.isabs(patchesdirname):
+    patchesdir = pathutil.canonpath(repo.root, repo.root, patchesdirname)
+  else:
+    patchesdir = repo.wvfs.reljoin(rootpath, patchesdirname)
+  if os.path.isabs(seriesfilename):
+    seriesfile = pathutil.canonpath(repo.root, repo.root, seriesfilename)
+  else:
+    seriesfile = repo.wvfs.reljoin(patchesdir, seriesfilename)
+  return _QuiltPaths(patchesdir, seriesfile)
+
+
 def _separatepatchdescription(patchcontent):
   patchlines = patchcontent.splitlines(keepends=True) + [b'']
   desclines = []
@@ -163,8 +187,9 @@ def _trackedroot(ui, repo, root):
     ui.status(b'inferring --root as "%s"\n' % (rootpath,))
   if not repo.wvfs.isdir(rootpath):
     raise error.Abort(b'%s: directory not found' % (rootpath,))
-  if not repo.wvfs.isdir(repo.wvfs.reljoin(rootpath, b'patches')):
-    raise error.Abort(b'%s: does not contain patches/ subdirectory' % (rootpath,))
+  qpaths = _quiltpaths(repo, rootpath)
+  if not repo.wvfs.isdir(qpaths.patchesdir):
+    raise error.Abort(b'%s: patches directory does not exist' % (qpaths.patchesdir,))
   _ensurenarrowspec(ui, repo, rootpath)
   if safehasattr(ui, 'reporting_record_meta'):
     ui.reporting_record_meta(b'quahog.root', rootpath)
@@ -310,7 +335,8 @@ def fold(ui, repo, **opts):  # pylint: disable=g-doc-args
   with repo.wlock(), repo.lock(), repo.transaction(b'qu-fold') as txn:
     cmdutil.bailifchanged(repo)
     cmdutil.checkunfinished(repo, commit=True)
-    seriespath = repo.wvfs.reljoin(rootpath, b'patches', b'series')
+    qpaths = _quiltpaths(repo, rootpath)
+    seriespath = qpaths.seriesfile
     if not repo.wvfs.isfile(seriespath):
       raise error.Abort(b'%s: no such file' % (seriespath,))
     if foldrevset and not _islinear(repo, foldrevset):
@@ -440,12 +466,12 @@ def fold(ui, repo, **opts):  # pylint: disable=g-doc-args
     merge.update(newctx, updatecheck=merge.UPDATECHECK_NO_CONFLICT)
     # add patch files
     for fname, content in patches.items():
-      patchpath = repo.wvfs.reljoin(rootpath, b'patches', fname)
+      patchpath = repo.wvfs.reljoin(qpaths.patchesdir, fname)
       ui.status(b'folding patch "%s"\n' % (fname,))
       with repo.wvfs(patchpath, b'wb') as patchfile:
         patchfile.write(content)
     repo[None].add([
-        repo.wvfs.reljoin(rootpath, b'patches', fname)
+        repo.wvfs.reljoin(qpaths.patchesdir, fname)
         for fname, _ in patches.items()
     ])
     # add to series file
@@ -550,7 +576,8 @@ def pop(ui, repo, **opts):  # pylint: disable=g-doc-args
         # Default to all children of the `from` quahog changeset, if it exists.
         or (b'none()' if createnew else b'children(. & not public())')
     )
-    seriespath = repo.wvfs.reljoin(rootpath, b'patches', b'series')
+    qpaths = _quiltpaths(repo, rootpath)
+    seriespath = qpaths.seriesfile
     if not repo.wvfs.isfile(seriespath):
       raise error.Abort(b'%s: no such file' % (seriespath,))
     with repo.wvfs(seriespath) as seriesfile:
@@ -568,7 +595,7 @@ def pop(ui, repo, **opts):  # pylint: disable=g-doc-args
       for i, patchtopop in zip(range(patchestopop), reversed(patches)):
         with repo.wvfs(seriespath, b'wb') as seriesfile:
           seriesfile.write(b'\n'.join(patches[:-i-1]) + b'\n')
-        patchpath = repo.wvfs.reljoin(rootpath, b'patches', patchtopop)
+        patchpath = repo.wvfs.reljoin(qpaths.patchesdir, patchtopop)
         with repo.wvfs(patchpath) as patchfile:
           patchcontent = patchfile.read()
         patchcontent, patchdesc = _separatepatchdescription(patchcontent)
