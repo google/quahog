@@ -478,8 +478,10 @@ def fold(ui, repo, **opts):  # pylint: disable=g-doc-args
         for fname, _ in patches.items()
     ])
     # add to series file
-    with repo.wvfs(seriespath, b'ab') as seriesfile:
-      seriesfile.write(b'\n'.join(patches.keys()) + b'\n')
+    with repo.wvfs(seriespath) as seriesfile:
+      series = seriesfile.read().splitlines() + list(patches)
+    with repo.wvfs(seriespath, b'wb') as seriesfile:
+      seriesfile.write(b''.join(p + b'\n' for p in series))
     # amend changes
     rewriteutil.precheck(repo, [newctx.rev()], b'amend')
     amendopts = opts.copy()
@@ -597,7 +599,7 @@ def pop(ui, repo, **opts):  # pylint: disable=g-doc-args
       patchinfos = []
       for i, patchtopop in zip(range(patchestopop), reversed(patches)):
         with repo.wvfs(seriespath, b'wb') as seriesfile:
-          seriesfile.write(b'\n'.join(patches[:-i-1]) + b'\n')
+          seriesfile.write(b''.join(p + b'\n' for p in patches[:-i-1]))
         patchpath = repo.wvfs.reljoin(qpaths.patchesdir, patchtopop)
         with repo.wvfs(patchpath) as patchfile:
           patchcontent = patchfile.read()
