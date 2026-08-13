@@ -139,7 +139,7 @@ def _hgdifftopatch(diff, root):
       # Quilt generates diffs that strip trailing whitespace from context lines.
       # Fig's diffs keep the trailing whitespace by default, so we remove that
       # here. This seems to only be configured for context lines, not all lines.
-      ending = line[-2:] if line[-2:] == '\r\n' else line[-1:]
+      ending = line[-2:] if line[-2:] == b'\r\n' else line[-1:]
       out = line.rstrip() + ending
     else:
       out = line
