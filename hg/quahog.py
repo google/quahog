@@ -419,8 +419,11 @@ def fold(ui, repo, **opts):  # pylint: disable=g-doc-args
       patchcontent = b''
       if patchdesc:
         patchcontent += patchdesc + b'\n\n'
-      # calculate diff
-      diffopts = patch.diffallopts(ui, opts={b'noprefix': True, b'git': True})
+      # calculate diff, disabling show_function as Quilt omits it
+      diffopts = patch.diffallopts(
+          ui,
+          opts={b'noprefix': True, b'git': True, b'show_function': False},
+      )
       ctx2 = scmutil.revsingle(repo, rev, None)
       ctx1 = ctx2.p1()
       m = scmutil.match(ctx2, [b'path:' + rootpath], {})
