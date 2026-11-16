@@ -80,4 +80,25 @@ o  #QUAHOG Modify patches for test-project.
 o  Initial commit
 +
 
+$ # Step 4: Pop those 2 patches back before the remaining patch3.diff
+$ quahog pop --root test-project --count 2 »
+Popping 2 patches from "test-project"
+Popping patch "patch2.diff"
+Popping patch "patch1.diff"
+Successfully popped 2 patches
+
+$ jj log --config ui.graph.style=ascii -T 'description.first_line() ++ "\n"' »
+@
+o  [PATCH] patch3.diff
+o  [PATCH] patch2.diff
+o  [PATCH] patch1.diff
+o  #QUAHOG Modify patches for test-project.
+o  Initial commit
++
+
+$ cat test-project/file1.txt test-project/file2.txt test-project/file3.txt »
+modified 1
+modified 2
+modified 3
+
 ```
