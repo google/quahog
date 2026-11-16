@@ -169,21 +169,8 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 		if err != nil {
 			return err
 		}
-		{
-			// Move working copy change before the patch so subsequent patches are created at the start of the chain.
-			var workingCopy *jjvcs.Change
-			if workingCopy, err = jj.Rev(ctx, "@"); err != nil {
-				return err
-			}
-			if len(chain.Patches) > 0 {
-				_, err = jj.Run(ctx, "rebase", "-r", workingCopy.ID, "--insert-before", chain.Patches[0].ID)
-				if err != nil {
-					return err
-				}
-			}
-		}
 		for i, patchInfo := range patches {
-			// Apply patch in reverse to remove changes
+			// Apply patch to working copy
 			if err = quilt.ApplyPatch(patchContent[i], rootAbspath); err != nil {
 				return fmt.Errorf("failed to apply patch %s: %w", patchInfo.Name, err)
 			}
@@ -194,6 +181,13 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 			_, err = jj.Run(ctx, "commit", "--message", commitMsg)
 			if err != nil {
 				return fmt.Errorf("failed to commit patch %s: %w", patchInfo.Name, err)
+			}
+		}
+		if len(chain.Patches) > 0 {
+			// Move existing patch commits onto the last newly popped patch commit.
+			_, err = jj.Run(ctx, "rebase", "-s", chain.Patches[0].ID, "--onto", "@-")
+			if err != nil {
+				return err
 			}
 		}
 		// Restore commit position
