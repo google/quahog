@@ -82,7 +82,11 @@ func (j *client) Revs(ctx context.Context, revset string) ([]*Change, error) {
 		return nil, fmt.Errorf("failed to get commit info for %s: %w", revset, err)
 	}
 	commits := []*Change{}
-	for entry := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
+	trimmed := strings.TrimSpace(out)
+	if trimmed == "" {
+		return commits, nil
+	}
+	for entry := range strings.SplitSeq(trimmed, "\n") {
 		parts := strings.SplitN(entry, " ", len(tplParts)-1)
 		if len(parts) < len(tplParts)-1 {
 			return nil, fmt.Errorf("unexpected log entry format: %q", entry)

@@ -102,15 +102,9 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 		return fmt.Errorf("failed to determine base op: %w", err)
 	}
 	baseOp = strings.TrimSpace(baseOp)
-	var originRev *jjvcs.Change
-	var originChild bool
-	if originRevs, err := jj.Revs(ctx, "@|@-"); err != nil {
+	origWC, err := jj.Rev(ctx, "@")
+	if err != nil {
 		return err
-	} else if !originRevs[0].IsEmpty || len(originRevs[0].Parents) != 1 {
-		originRev = originRevs[0]
-	} else {
-		originRev = originRevs[1]
-		originChild = true
 	}
 	var popFromRev *jjvcs.Change
 	if cfg.From != "" {
@@ -126,7 +120,7 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 	if popFromRev != nil {
 		rev = popFromRev.ID
 	} else {
-		rev = originRev.ID
+		rev = origWC.ID
 	}
 	// Must rollback from this point forward
 	err = func() error {
@@ -196,17 +190,26 @@ func runPop(ctx context.Context, cio IO, cfg PopConfig) (err error) {
 				return fmt.Errorf("failed to commit patch %s: %w", patchInfo.Name, err)
 			}
 		}
-		// Restore commit position
-		var restoreArgs []string
-		if originRev.ID == chain.Base.ID && originChild {
-			restoreArgs = []string{"edit", "@"} // cursor should be in the correct spot already
-		} else if originChild {
-			restoreArgs = []string{"new", originRev.ID}
-		} else {
-			restoreArgs = []string{"edit", originRev.ID}
+		// Restore commit position (jj commit left @ as an empty child of the last popped patch, @-).
+		cursorStartedAtBase := quahog.IsOriginChild(origWC) &&
+			(origWC.Parents[0] == chain.Base.ID || (chain.CreatedBase && len(chain.Patches) == 0))
+		revs, err := jj.Revs(ctx, fmt.Sprintf("present(%s)", origWC.ID))
+		if err != nil {
+			return err
 		}
-		if _, err := jj.Run(ctx, restoreArgs...); err != nil {
-			return fmt.Errorf("failed to restore commit position: %w", err)
+		if len(revs) > 0 {
+			if cursorStartedAtBase {
+				if _, err := jj.Run(ctx, "rebase", "-s", origWC.ID, "--onto", "@-"); err != nil {
+					return fmt.Errorf("failed to rebase working copy onto popped patches: %w", err)
+				}
+			}
+			if _, err := jj.Run(ctx, "edit", origWC.ID); err != nil {
+				return fmt.Errorf("failed to restore commit position: %w", err)
+			}
+		} else if !cursorStartedAtBase {
+			if _, err := jj.Run(ctx, "new", origWC.Parents[0]); err != nil {
+				return fmt.Errorf("failed to restore commit position: %w", err)
+			}
 		}
 		fmt.Fprintf(cio.Err, "Successfully popped %d patch%s\n", len(patches), pluralize(patches, "es"))
 		return nil

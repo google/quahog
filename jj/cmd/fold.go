@@ -100,15 +100,9 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 		return fmt.Errorf("failed to determine base op: %w", err)
 	}
 	baseOp = strings.TrimSpace(baseOp)
-	var originRev *jjvcs.Change
-	var originChild bool
-	if originRevs, err := jj.Revs(ctx, "@|@-"); err != nil {
+	origWC, err := jj.Rev(ctx, "@")
+	if err != nil {
 		return err
-	} else if !originRevs[0].IsEmpty || len(originRevs[0].Parents) != 1 {
-		originRev = originRevs[0]
-	} else {
-		originRev = originRevs[1]
-		originChild = true
 	}
 	var foldToRev *jjvcs.Change
 	if cfg.To != "" {
@@ -137,7 +131,7 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 	} else if cfg.Rev != "" {
 		rev = foldRevs[0].ID
 	} else {
-		rev = originRev.ID
+		rev = origWC.ID
 	}
 	err = func() error {
 		chain, err := quahog.NewPatchChain(ctx, jj, quahog.ChainOptions{OriginRev: rev, RootRelpath: rootRelRepo})
@@ -216,13 +210,17 @@ func runFold(ctx context.Context, cio IO, cfg FoldConfig) error {
 			return fmt.Errorf("failed to squash commits: %w", err)
 		}
 		// Restore commit position
+		revs, err := jj.Revs(ctx, fmt.Sprintf("present(%s)", origWC.ID))
+		if err != nil {
+			return err
+		}
 		var restoreArgs []string
-		if slices.Contains(commitIDs, originRev.ID) {
-			restoreArgs = []string{"new", chain.Base.ID}
-		} else if originChild {
-			restoreArgs = []string{"new", originRev.ID}
+		if len(revs) > 0 {
+			restoreArgs = []string{"edit", origWC.ID}
+		} else if quahog.IsOriginChild(origWC) && !slices.Contains(commitIDs, origWC.Parents[0]) {
+			restoreArgs = []string{"new", origWC.Parents[0]}
 		} else {
-			restoreArgs = []string{"edit", originRev.ID}
+			restoreArgs = []string{"new", chain.Base.ID}
 		}
 		if _, err := jj.Run(ctx, restoreArgs...); err != nil {
 			return fmt.Errorf("failed to restore commit position: %w", err)
