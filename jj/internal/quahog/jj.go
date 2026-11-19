@@ -31,12 +31,20 @@ func IsPatch(c *jjvcs.Change) bool {
 	return strings.HasPrefix(c.Description, patchCommitPrefix) && c.IsMutable
 }
 
+// IsOriginChild returns true if the change is an empty non-base, non-patch
+// commit that implicitly targets its single parent commit.
+func IsOriginChild(c *jjvcs.Change) bool {
+	return c.IsEmpty && len(c.Parents) == 1 && !IsBase(c) && !IsPatch(c)
+}
+
 // PatchChain holds the analyzed chain of patch commits.
 type PatchChain struct {
 	// The sequence of patch commits from the starting revision up to the root.
 	Patches []*jjvcs.Change
 	// The root change that stopped the chain walk (e.g., a base, immutable, or non-patch change).
 	Base *jjvcs.Change
+	// CreatedBase is true when NewPatchChain created a new Base commit.
+	CreatedBase bool
 }
 
 type ChainOptions struct {
@@ -50,13 +58,17 @@ func NewPatchChain(ctx context.Context, jj jjvcs.Client, opts ChainOptions) (*Pa
 	if opts.RootRelpath == "" {
 		return nil, fmt.Errorf("root relpath required")
 	}
-	var originID string
-	if c, err := jj.Rev(ctx, opts.OriginRev); err != nil {
+	revs, err := jj.Revs(ctx, fmt.Sprintf("(%s)|(%s)-", opts.OriginRev, opts.OriginRev))
+	if err != nil {
 		return nil, err
-	} else if !c.IsEmpty || len(c.Parents) != 1 {
-		originID = c.ID
-	} else {
-		originID = c.Parents[0]
+	}
+	if len(revs) == 0 {
+		return nil, fmt.Errorf("failed to get commit for revset %s", opts.OriginRev)
+	}
+	c := revs[0]
+	originID := c.ID
+	if IsOriginChild(c) && len(revs) == 2 && (IsBase(revs[1]) || IsPatch(revs[1])) {
+		originID = revs[1].ID
 	}
 	// Revset captures all ancestors and descendants of our target rev, from oldest to newest.
 	revset := fmt.Sprintf("descendants(%s)|(heads(immutable())::ancestors(%s))", originID, originID)
@@ -152,8 +164,10 @@ func NewPatchChain(ctx context.Context, jj jjvcs.Client, opts ChainOptions) (*Pa
 		args := []string{"new", "-m", commitMsg}
 		if len(chain.Patches) != 0 {
 			args = append(args, "--insert-before", chain.Patches[0].ID)
+		} else if IsOriginChild(c) {
+			args = append(args, "--insert-before", c.ID)
 		} else {
-			args = append(args, "--insert-after", originID)
+			args = append(args, originID)
 		}
 		// TODO: Should we add an --insert-after to get the base to appear pre-octopus?
 		_, err := jj.Run(ctx, args...)
@@ -161,11 +175,12 @@ func NewPatchChain(ctx context.Context, jj jjvcs.Client, opts ChainOptions) (*Pa
 			return nil, err
 		}
 		// TODO: Fix chain.Patches[0].Parents which will now be stale
-		c, err := jj.Rev(ctx, "@")
+		base, err := jj.Rev(ctx, "@")
 		if err != nil {
 			return nil, err
 		}
-		chain.Base = c
+		chain.Base = base
+		chain.CreatedBase = true
 	} else {
 		_, err := jj.Run(ctx, "edit", chain.Base.ID)
 		if err != nil {
